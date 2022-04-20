@@ -1,102 +1,20 @@
- const SHA256 = require('crypto-js/sha256')
+const {Blockchain, Transaction} = require('./blockchain');
+const EC = require('elliptic').ec;
+const ec = new EC ("secp256k1");
 
-class Transaction {
-    constructor(fromAddress, toAddress, amount) {
-        this.fromAddress = fromAddress;
-        this.toAddress = toAddress;
-        this.amount = amount;
-    }
-}
+const myKey = ec.keyFromPrivate("b665664be3ee4e8810c7b895a49a163ce4f9ca2eeb8f30b79883e9da55712fd3");
+const myWalletAddress = myKey.getPublic('hex');
 
-class Block {
-    constructor(timestamp, transactions, previousHash = '') {
-        this.timestamp = timestamp;
-        this.transactions = transactions;
-        this.previousHash = previousHash;
-        this.hash = this.calculateHash();
-        this.nonce = 0;
-    }
+let santiCoin = new Blockchain();
 
-    calculateHash() {
-        return SHA256(this.previousHash + this.timestamp + JSON.stringify(this.transactions) + this.nonce).toString();
-    }
+const tx1 = new Transaction(myWalletAddress, "public key goes here", 100);
 
-    mineBlock(difficulty) {
-        while(this.hash.substring(0, difficulty) !== Array(difficulty + 1).join("0")) {
-            this.nonce++;
-            this.hash = this.calculateHash();
-        }
-
-        console.log("Block mined: " + this.hash);
-    }
-}
-
-class BlockChain {
-    constructor() {
-        this.chain = [this.createGenesisBlock()];
-        this.difficulty = 2;
-        this.pendingTransactions = [];
-        this.miningReward = 100;
-    }
-
-    createGenesisBlock() {
-        return new Block("20/04/2022", "Genesis Block", "0");
-    }
-
-    getLatestBlock() {
-        return this.chain[this.chain.length - 1];
-    }
-
-    minePendingTransactions(miningRewardAddress) {
-        let block = new Block(Date.now(), this.pendingTransactions);
-        block.mineBlock(this.difficulty);
-
-        console.log("Block successfully mined!");
-        this.chain.push(block);
-
-        this.pendingTransactions = [
-            new Transaction(null, miningRewardAddress, this.miningReward)
-        ];
-    }
-
-    createTransaction(transaction) {
-        this.pendingTransactions.push(transaction);
-    }
-
-    checkBalance(address) {
-        let balance = 0;
-        for (const block of this.chain) {
-            for (const transaction of block.transactions) {
-                if (transaction.fromAddress === address) {
-                    balance -= transaction.amount;
-                }
-                if (transaction.toAddress === address) {
-                    balance += transaction.amount;
-                }
-            }
-        }
-        return balance;
-    }
-
-    isChainValid() {
-        for (let i = 1; i < this.chain.length; i++) {
-            const currentBlock = this.chain[i];
-            const previousBlock = this.chain[i-1];
-            if (currentBlock.hash != currentBlock.calculateHash() || currentBlock.previousHash != previousBlock.hash) return false;
-        } 
-        return true;
-    }
-}
-let santiCoin = new BlockChain();
-santiCoin.createTransaction(new Transaction ("Address1", "Address2", 100));
-santiCoin.createTransaction(new Transaction ("Address2", "Address1", 50));
+tx1.signTransaction(myKey);
+santiCoin.addTransaction(tx1);
 
 console.log("\nStarting the miner...");
-santiCoin.minePendingTransactions("santi-address");
+santiCoin.minePendingTransactions(myWalletAddress);
 
-console.log("\nBalance of Santi is ", santiCoin.checkBalance("santi-address"));
+console.log("\nBalance of Santi is ", santiCoin.checkBalance(myWalletAddress));
 
-console.log("\nStarting the miner...");
-santiCoin.minePendingTransactions("santi-address");
-
-console.log("\nBalance of Santi is ", santiCoin.checkBalance("santi-address"));
+console.log("Is chain valid?", santiCoin.isChainValid());
